@@ -20,6 +20,7 @@
     - 提供 HTML/JS 示例页面
 
   ## 项目结构(大致架构)
+  ```markdown
   spring-ai-chat-starter/
   ├── src/main/java/com/randb/springaichatstarter/
   │ ├── autoconfigure/ # 自动配置类 
@@ -57,7 +58,7 @@
   │ │ └── websocket.html # WebSocket示例页面
   │ └── application.yml # 默认配置文件
   └── pom.xml # Maven配置
-
+  ```
   该项目结构遵循以下设计原则：
 
   1. **模块化设计**：按功能将代码组织到不同包中
