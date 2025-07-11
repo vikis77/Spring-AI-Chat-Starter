@@ -1,0 +1,5 @@
+com.randb.springaichatstarter.autoconfigure.SpringAiChatAutoConfiguration
+com.randb.springaichatstarter.autoconfigure.ChatServiceAutoConfiguration
+com.randb.springaichatstarter.autoconfigure.DashScopeModelAutoConfig
+com.randb.springaichatstarter.autoconfigure.QwenServiceAutoConfiguration
+com.randb.springaichatstarter.autoconfigure.RabbitMQConfiguration

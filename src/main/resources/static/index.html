@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring AI Chat Starter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .user {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .assistant {
+            background-color: #f1f1f1;
+            margin-right: 20%;
+        }
+        .input-container {
+            display: flex;
+        }
+        #prompt {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spring AI Chat Starter</h1>
+    <div class="chat-container" id="chat-container"></div>
+    <div class="input-container">
+        <input type="text" id="prompt" placeholder="输入您的问题...">
+        <button onclick="sendMessage()">发送</button>
+        <button onclick="sendStreamMessage()">流式发送</button>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const promptInput = document.getElementById('prompt');
+        const userId = 'user-' + Math.floor(Math.random() * 1000);
+
+        function addMessage(content, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            messageDiv.textContent = content;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendMessage() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            addMessage(prompt, true);
+            promptInput.value = '';
+
+            fetch('/api/chat/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userId: userId,
+                    prompt: prompt,
+                    model: 'qwen'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addMessage(data.content, false);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                addMessage('发生错误，请重试', false);
+            });
+        }
+
+        function sendStreamMessage() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            addMessage(prompt, true);
+            promptInput.value = '';
+
+            const responseDiv = document.createElement('div');
+            responseDiv.className = 'message assistant';
+            chatContainer.appendChild(responseDiv);
+
+            const eventSource = new EventSource(`/api/chat/sse?userId=${userId}&prompt=${encodeURIComponent(prompt)}&model=qwen`);
+            
+            let fullResponse = '';
+            
+            eventSource.onmessage = function(event) {
+                fullResponse += event.data;
+                responseDiv.textContent = fullResponse;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            };
+            
+            eventSource.onerror = function(error) {
+                eventSource.close();
+                if (fullResponse === '') {
+                    responseDiv.textContent = '发生错误，请重试';
+                }
+            };
+            
+            eventSource.addEventListener('end', function() {
+                eventSource.close();
+            });
+        }
+
+        // 按Enter键发送消息
+        promptInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 

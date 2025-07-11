@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring AI Chat - WebSocket Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .user {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .assistant {
+            background-color: #f1f1f1;
+            margin-right: 20%;
+        }
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        #prompt {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .model-selector {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        .model-selector label {
+            margin-right: 10px;
+        }
+        .status {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spring AI Chat - WebSocket Demo</h1>
+    
+    <div class="status disconnected" id="status">未连接</div>
+    
+    <div class="model-selector">
+        <label>选择模型:</label>
+        <select id="model">
+            <option value="qwen">通义千问</option>
+            <option value="openai">OpenAI</option>
+        </select>
+        <button id="connect-btn">连接</button>
+        <button id="disconnect-btn" disabled>断开</button>
+    </div>
+    
+    <div class="chat-container" id="chat-container"></div>
+    
+    <div class="input-container">
+        <input type="text" id="prompt" placeholder="输入您的问题..." disabled>
+        <div class="controls">
+            <button id="send-btn" disabled>发送</button>
+            <button id="clear-btn">清空对话</button>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const chatContainer = document.getElementById('chat-container');
+        const promptInput = document.getElementById('prompt');
+        const modelSelect = document.getElementById('model');
+        const statusDiv = document.getElementById('status');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        
+        // WebSocket对象
+        let socket;
+        // 生成随机用户ID
+        const userId = 'user-' + Math.floor(Math.random() * 10000);
+        
+        // 连接WebSocket
+        connectBtn.addEventListener('click', function() {
+            const model = modelSelect.value;
+            
+            // 创建WebSocket连接
+            socket = new WebSocket(`ws://${window.location.host}/api/chat/ws`);
+            
+            // 连接打开时
+            socket.onopen = function() {
+                statusDiv.textContent = '已连接';
+                statusDiv.className = 'status connected';
+                
+                promptInput.disabled = false;
+                sendBtn.disabled = false;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                
+                addSystemMessage('WebSocket连接已建立');
+            };
+            
+            // 接收到消息时
+            socket.onmessage = function(event) {
+                try {
+                    const response = JSON.parse(event.data);
+                    
+                    // 检查是否有现有的响应占位符
+                    const existingResponse = document.getElementById('assistant-response');
+                    
+                    if (existingResponse) {
+                        // 追加内容而不是替换
+                        existingResponse.textContent = response.content;
+                    } else {
+                        // 如果没有占位符，创建新的消息
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message assistant';
+                        messageDiv.textContent = response.content;
+                        chatContainer.appendChild(messageDiv);
+                    }
+                    
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                } catch (error) {
+                    console.error('解析消息失败:', error);
+                    addSystemMessage('接收到无效消息: ' + error.message);
+                }
+            };
+            
+            // 连接关闭时
+            socket.onclose = function() {
+                statusDiv.textContent = '未连接';
+                statusDiv.className = 'status disconnected';
+                
+                promptInput.disabled = true;
+                sendBtn.disabled = true;
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                
+                addSystemMessage('WebSocket连接已关闭');
+            };
+            
+            // 连接错误时
+            socket.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+                addSystemMessage('WebSocket连接错误: ' + (error.message || '未知错误'));
+                
+                statusDiv.textContent = '连接错误';
+                statusDiv.className = 'status disconnected';
+            };
+        });
+        
+        // 断开WebSocket连接
+        disconnectBtn.addEventListener('click', function() {
+            if (socket) {
+                socket.close();
+            }
+        });
+        
+        // 发送消息
+        sendBtn.addEventListener('click', sendMessage);
+        
+        // 清空对话
+        clearBtn.addEventListener('click', function() {
+            chatContainer.innerHTML = '';
+        });
+        
+        // 按Enter键发送消息
+        promptInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // 发送消息函数
+        function sendMessage() {
+            const prompt = promptInput.value.trim();
+            if (!prompt || !socket || socket.readyState !== WebSocket.OPEN) return;
+            
+            // 添加用户消息到界面
+            addUserMessage(prompt);
+            
+            // 清除之前的响应占位符
+            const existingResponse = document.getElementById('assistant-response');
+            if (existingResponse) {
+                existingResponse.removeAttribute('id');
+            }
+            
+            // 创建响应消息的占位符
+            addAssistantMessagePlaceholder();
+            
+            // 创建请求对象
+            const request = {
+                userId: userId,
+                prompt: prompt,
+                model: modelSelect.value,
+                requestId: 'req-' + Date.now()
+            };
+            
+            // 发送请求
+            socket.send(JSON.stringify(request));
+            
+            // 清空输入框
+            promptInput.value = '';
+        }
+        
+        // 添加用户消息
+        function addUserMessage(text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 添加系统消息
+        function addSystemMessage(text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.style.backgroundColor = '#e8f5e9';
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 添加AI助手消息占位符
+        function addAssistantMessagePlaceholder() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = 'assistant-response';
+            messageDiv.textContent = '正在思考...';
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 更新AI助手消息
+        function updateAssistantMessage(text) {
+            const messageDiv = document.getElementById('assistant-response');
+            if (messageDiv) {
+                messageDiv.textContent = text;
+                messageDiv.removeAttribute('id');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } else {
+                // 如果找不到现有的消息占位符，创建一个新的消息
+                const newMessageDiv = document.createElement('div');
+                newMessageDiv.className = 'message assistant';
+                newMessageDiv.textContent = text;
+                chatContainer.appendChild(newMessageDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html> 
