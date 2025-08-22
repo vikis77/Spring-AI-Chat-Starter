@@ -112,3 +112,4 @@ yarn-error.log*
 # 项目特定文件
 README-slef.md
 HELP.md
+src/main/resources/application.yml
