@@ -32,6 +32,7 @@ Spring Boot 系统一键接入大模型通信组件，支持通义千问、OpenA
 ## 📦 构建和部署
 
 ### 作为 Starter 使用（推荐）
+（使用示例，我的另一个项目 [Digital-Life-Engine](https://github.com/vikis77/Digital-Life-Engine) 有使用到本 Starter，如果需要参考可以 clone 源码查看）
 
 1. **注释 Maven Plugin**：在 `pom.xml` 中注释掉 `spring-boot-maven-plugin`
    ```xml
