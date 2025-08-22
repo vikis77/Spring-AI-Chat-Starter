@@ -1,0 +1,63 @@
+# Spring AI Chat Starter 配置模板
+# 复制此文件为 application.yml 并填入你的配置
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: your-app-name
+  
+  ai:
+    # 通义千问配置
+    dashscope:
+      chat:
+        options:
+          model: qwen-turbo  # 可选: qwen-turbo, qwen-plus, qwen-max
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key-here}
+    
+    # OpenAI 配置 (可选)
+    openai:
+      api-key: ${OPENAI_API_KEY:your-openai-api-key-here}
+      chat:
+        options:
+          model: gpt-3.5-turbo
+    
+    # 默认模型设置
+    model:
+      chat: dashscope  # 或 openai
+    
+    # Chat Starter 配置
+    chat:
+      # 是否启用AI聊天功能
+      enabled: true
+      # 默认模型
+      default-model: qwen
+      
+      # WebSocket配置
+      websocket:
+        enabled: true
+        path: /api/chat/ws
+      
+      # RabbitMQ配置 (可选)
+      rabbitmq:
+        enabled: false
+        exchange: chat.exchange
+        queue: chat.queue
+        routing-key: chat.request
+        reply-queue: chat.reply
+        reply-routing-key: chat.reply
+      
+      # REST API控制器配置
+      controller:
+        enabled: true
+        base-path: /api/chat
+      
+      # 调试模式
+      debug: false
+
+# 日志配置 (可选)
+logging:
+  level:
+    com.randb.springaichatstarter: INFO
+    org.springframework.ai: WARN

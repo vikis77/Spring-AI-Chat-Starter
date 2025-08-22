@@ -1,13 +1,17 @@
 package com.randb.springaichatstarter.core;
 
 import com.randb.springaichatstarter.dto.ChatRequest;
+import com.randb.springaichatstarter.dto.ChatResponse;
+import com.randb.springaichatstarter.util.ChatResponseUtil;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
 import reactor.core.publisher.Flux;
 
@@ -24,6 +28,7 @@ import jakarta.annotation.PostConstruct;
 public class QwenChatServiceImpl implements ChatService {
 
     private ChatClient chatClient;
+    private ChatMemory chatMemory;
     private final DefaultQwenChatServiceImpl fallbackService;
     private final ApplicationContext applicationContext;
 
@@ -90,24 +95,24 @@ public class QwenChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Flux<String> streamReply(ChatRequest req) {
+    public Flux<ChatResponse> streamReply(ChatRequest req) {
         log.info("Qwen streaming reply for prompt: {}", req.getPrompt());
-        
+
         // 获取ChatClient
         ChatClient client = getChatClient();
         if (client == null) {
             log.warn("ChatClient不可用，使用降级服务进行流式回复");
             return fallbackService.streamReply(req);
         }
-        
+
         try {
             log.debug("准备调用ChatClient.prompt().user().stream()");
             Flux<String> responseFlux = client.prompt()
                     .user(req.getPrompt())
                     .stream()
                     .content();
-            
-            // 在Flux上应用操作符
+
+            // 在Flux上应用操作符，将String转换为ChatResponse
             return responseFlux
                     .doOnSubscribe(s -> log.debug("Stream已订阅"))
                     .doOnNext(chunk -> log.debug("收到流式响应片段: {}", chunk.length() > 20 ? chunk.substring(0, 20) + "..." : chunk))
@@ -115,7 +120,8 @@ public class QwenChatServiceImpl implements ChatService {
                     .doOnError(e -> {
                         log.error("流式响应出错: {}", e.getMessage());
                         // 不在这里处理错误，让它传播到下面的catch块
-                    });
+                    })
+                    .map(content -> ChatResponseUtil.createMessage(req, content));
         } catch (Exception e) {
             log.error("处理流式回复时发生异常: {}，将使用降级服务", e.getMessage(), e);
             return fallbackService.streamReply(req)
@@ -124,28 +130,39 @@ public class QwenChatServiceImpl implements ChatService {
     }
 
     @Override
-    public String syncReply(ChatRequest req) {
-        log.info("Qwen sync reply for prompt: {}", req.getPrompt());
-        
+    public ChatResponse syncReply(ChatRequest req) {
+//        log.info("Qwen sync reply for prompt: {}", req.getPrompt());
+
+        //对话记忆的唯一标识
+        // String conversantId = UUID.randomUUID().toString();
+        String conversantId = req.getSessionId();
+
         // 获取ChatClient
         ChatClient client = getChatClient();
         if (client == null) {
             log.warn("ChatClient不可用，使用降级服务进行同步回复");
             return fallbackService.syncReply(req);
         }
-        
+
         try {
             log.debug("准备调用ChatClient.prompt().user().call()");
             String content = client.prompt()
                     .user(req.getPrompt())
+                    .advisors(spec -> spec.param("CHAT_MEMORY_CONVERSATION_ID_KEY", conversantId)
+                        .param("CHAT_MEMORY_RETRIEVE_SIZE_KEY", 10))
                     .call()
                     .content();
-            
+
             log.debug("收到同步响应: {}", content.length() > 50 ? content.substring(0, 50) + "..." : content);
-            return content;
+
+            return ChatResponseUtil.createMessage(req, content);
         } catch (Exception e) {
             log.error("处理同步回复时发生异常: {}，将使用降级服务", e.getMessage(), e);
-            return fallbackService.syncReply(req) + "\n\n[注: 由于API调用错误，此为降级服务回复]";
+            ChatResponse fallbackResponse = fallbackService.syncReply(req);
+            fallbackResponse.setContent(fallbackResponse.getContent() + "\n\n[注: 由于API调用错误，此为降级服务回复]");
+            return fallbackResponse;
         }
     }
+
+    
 }

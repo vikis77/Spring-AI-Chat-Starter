@@ -5,7 +5,6 @@ import com.randb.springaichatstarter.core.ChatModelFactory;
 import com.randb.springaichatstarter.core.ChatService;
 import com.randb.springaichatstarter.dto.ChatRequest;
 import com.randb.springaichatstarter.dto.ChatResponse;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * WebSocket处理器
- * 只有在启用WebSocket时才创建
  * @Date: 2025-07-11 13:09:33
  * @Author: randb
  */
@@ -34,48 +32,66 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final ChatModelFactory chatModelFactory;
     private final ObjectMapper objectMapper;
-    private final ConcurrentHashMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+
+    /** sessionId -> WebSocketSession */
+    private final ConcurrentHashMap<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+
+    /** userId -> sessionId */
+    private final ConcurrentHashMap<String, String> userSessionMap = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void init() {
-        log.info("ChatWebSocketHandler已创建，准备处理WebSocket连接");
+        log.info("ChatWebSocketHandler 已创建，准备处理 WebSocket 连接");
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        sessions.put(session.getId(), session);
-        log.info("WebSocket connection established: {}", session.getId());
+        sessionMap.put(session.getId(), session);
+        log.info("WebSocket 连接建立: {}", session.getId());
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        String payload = message.getPayload();
         try {
-            String payload = message.getPayload();
-            ChatRequest request = objectMapper.readValue(payload, ChatRequest.class);
-            
-            if (request.getModel() == null || request.getModel().isEmpty()) {
-                request.setModel("qwen"); // 默认使用通义千问
+            // 处理心跳
+            if ("ping".equalsIgnoreCase(payload)) {
+                sendMessage(session, createSystemResponse("pong", "pong"));
+                return;
             }
-            
-            log.info("Received WebSocket message: {}", payload);
-            
+
+            ChatRequest request = objectMapper.readValue(payload, ChatRequest.class);
+
+            if (request.getModel() == null || request.getModel().isEmpty()) {
+                request.setModel("qwen"); // 默认模型
+            }
+
+            if (request.getUserId() != null) {
+                userSessionMap.put(request.getUserId(), session.getId());
+            }
+
+            log.info("收到 WebSocket 消息: {}", payload);
+
             ChatService chatService = chatModelFactory.get(request.getModel());
-            
+
             chatService.streamReply(request).subscribe(
-                content -> sendMessage(session, createResponse(request, content)),
-                error -> handleError(session, error),
-                () -> log.info("WebSocket streaming completed for session: {}", session.getId())
+                response -> sendMessage(session, convertToJson(response)),
+                error -> handleError(session, error, request),
+                () -> sendMessage(session, createResponse("completed", request, "[DONE]"))
             );
+
         } catch (Exception e) {
-            log.error("Error handling WebSocket message", e);
+            log.error("处理 WebSocket 消息异常", e);
             sendErrorMessage(session, "Error processing request: " + e.getMessage());
         }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        sessions.remove(session.getId());
-        log.info("WebSocket connection closed: {}", session.getId());
+        sessionMap.remove(session.getId());
+        // 同步清理 userId -> sessionId
+        userSessionMap.entrySet().removeIf(entry -> entry.getValue().equals(session.getId()));
+        log.info("WebSocket 连接关闭: {}", session.getId());
     }
 
     private void sendMessage(WebSocketSession session, String message) {
@@ -84,42 +100,59 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(new TextMessage(message));
             }
         } catch (IOException e) {
-            log.error("Error sending WebSocket message", e);
+            log.error("发送 WebSocket 消息异常", e);
         }
     }
 
-    private void handleError(WebSocketSession session, Throwable error) {
-        log.error("Error in WebSocket stream", error);
-        try {
-            String errorMessage = "Error in AI response: " + (error.getMessage() != null ? error.getMessage() : "Connection reset");
-            sendErrorMessage(session, errorMessage);
-        } catch (Exception e) {
-            log.error("Failed to send error message", e);
-        }
+    private void handleError(WebSocketSession session, Throwable error, ChatRequest request) {
+        log.error("WebSocket 流处理错误", error);
+        String errorMessage = "Error in AI response: " +
+                (error.getMessage() != null ? error.getMessage() : "Connection reset");
+        sendMessage(session, createResponse("error", request, errorMessage));
     }
 
     private void sendErrorMessage(WebSocketSession session, String errorMessage) {
         try {
-            ChatResponse errorResponse = new ChatResponse();
-            errorResponse.setContent(errorMessage);
-            errorResponse.setRequestId(UUID.randomUUID().toString());
-            String json = objectMapper.writeValueAsString(errorResponse);
+            String json = createSystemResponse("error", errorMessage);
             sendMessage(session, json);
         } catch (Exception e) {
-            log.error("Error sending error message", e);
+            log.error("发送错误消息失败", e);
         }
     }
 
-    private String createResponse(ChatRequest request, String content) {
+    private String createResponse(String type, ChatRequest request, String content) {
         try {
             ChatResponse response = new ChatResponse();
+            response.setType(type);
             response.setContent(content);
             response.setUserId(request.getUserId());
             response.setRequestId(request.getRequestId() != null ? request.getRequestId() : UUID.randomUUID().toString());
             return objectMapper.writeValueAsString(response);
         } catch (Exception e) {
-            log.error("Error creating response", e);
+            log.error("构建响应失败", e);
             return "{}";
         }
     }
-} 
+
+    private String createSystemResponse(String type, String content) {
+        try {
+            ChatResponse response = new ChatResponse();
+            response.setType(type);
+            response.setContent(content);
+            response.setRequestId(UUID.randomUUID().toString());
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            log.error("构建系统响应失败", e);
+            return "{}";
+        }
+    }
+
+    private String convertToJson(ChatResponse response) {
+        try {
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            log.error("转换ChatResponse为JSON失败", e);
+            return "{}";
+        }
+    }
+}

@@ -1,6 +1,8 @@
 package com.randb.springaichatstarter.core;
 
 import com.randb.springaichatstarter.dto.ChatRequest;
+import com.randb.springaichatstarter.dto.ChatResponse;
+import com.randb.springaichatstarter.util.ChatResponseUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -33,22 +35,23 @@ public class OpenAIChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Flux<String> streamReply(ChatRequest req) {
+    public Flux<ChatResponse> streamReply(ChatRequest req) {
         log.info("OpenAI streaming reply for prompt: {}", req.getPrompt());
         try {
             log.debug("准备调用ChatClient.prompt().user().stream()");
             return chatClient.prompt()
                     .user(req.getPrompt())
                     .stream()
-                    .content();
+                    .content()
+                    .map(content -> ChatResponseUtil.createMessage(req, content));
         } catch (Exception e) {
             log.error("处理流式回复时发生异常", e);
-            return Flux.just("处理请求时发生错误: " + e.getMessage());
+            return Flux.just(ChatResponseUtil.createError(req, "处理请求时发生错误: " + e.getMessage()));
         }
     }
 
     @Override
-    public String syncReply(ChatRequest req) {
+    public ChatResponse syncReply(ChatRequest req) {
         log.info("OpenAI sync reply for prompt: {}", req.getPrompt());
         try {
             log.debug("准备调用ChatClient.prompt().user().call()");
@@ -56,12 +59,14 @@ public class OpenAIChatServiceImpl implements ChatService {
                     .user(req.getPrompt())
                     .call()
                     .content();
-            
+
             log.debug("收到同步响应: {}", content.length() > 50 ? content.substring(0, 50) + "..." : content);
-            return content;
+
+            return ChatResponseUtil.createMessage(req, content);
         } catch (Exception e) {
             log.error("处理同步回复时发生异常", e);
-            return "处理请求时发生错误: " + e.getMessage();
+
+            return ChatResponseUtil.createError(req, "处理请求时发生错误: " + e.getMessage());
         }
     }
 }

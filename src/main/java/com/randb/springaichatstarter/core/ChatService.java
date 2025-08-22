@@ -1,6 +1,7 @@
 package com.randb.springaichatstarter.core;
 
 import com.randb.springaichatstarter.dto.ChatRequest;
+import com.randb.springaichatstarter.dto.ChatResponse;
 import reactor.core.publisher.Flux;
 
 /**
@@ -13,14 +14,14 @@ public interface ChatService {
     /**
      * 流式返回（适用于SSE/WebSocket）
      * @param request 聊天请求
-     * @return 流式响应内容
+     * @return 流式响应对象
      */
-    Flux<String> streamReply(ChatRequest request);
+    Flux<ChatResponse> streamReply(ChatRequest request);
 
     /**
      * 同步返回（用于HTTP普通问答）
      * @param request 聊天请求
-     * @return 完整响应内容
+     * @return 完整响应对象
      */
-    String syncReply(ChatRequest request);
+    ChatResponse syncReply(ChatRequest request);
 }

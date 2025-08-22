@@ -1,6 +1,8 @@
 package com.randb.springaichatstarter.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
@@ -9,7 +11,10 @@ import java.io.Serializable;
  * @Author: randb
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class ChatResponse implements Serializable {
+    private String type;      // message | error | completed | pong
     private String requestId;   // 请求ID
     private String userId;      // 用户ID
     private String content;     // 回复内容

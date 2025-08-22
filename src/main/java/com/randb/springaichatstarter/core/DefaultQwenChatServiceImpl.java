@@ -1,6 +1,8 @@
 package com.randb.springaichatstarter.core;
 
 import com.randb.springaichatstarter.dto.ChatRequest;
+import com.randb.springaichatstarter.dto.ChatResponse;
+import com.randb.springaichatstarter.util.ChatResponseUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -23,14 +25,20 @@ public class DefaultQwenChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Flux<String> streamReply(ChatRequest req) {
+    public Flux<ChatResponse> streamReply(ChatRequest req) {
         log.warn("使用默认的通义千问实现(DefaultQwenChatServiceImpl)进行流式回复，这不会调用真正的AI服务");
-        return Flux.just("这是默认的通义千问回复（流式）: " + req.getPrompt());
+
+        ChatResponse response = ChatResponseUtil.createMessage(req,
+                "这是默认的通义千问回复（流式）: " + req.getPrompt());
+
+        return Flux.just(response);
     }
 
     @Override
-    public String syncReply(ChatRequest req) {
+    public ChatResponse syncReply(ChatRequest req) {
         log.warn("使用默认的通义千问实现(DefaultQwenChatServiceImpl)进行同步回复，这不会调用真正的AI服务");
-        return "这是默认的通义千问回复（同步）: " + req.getPrompt();
+
+        return ChatResponseUtil.createMessage(req,
+                "这是默认的通义千问回复（同步）: " + req.getPrompt());
     }
 }

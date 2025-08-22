@@ -1,6 +1,8 @@
 package com.randb.springaichatstarter.core;
 
 import com.randb.springaichatstarter.dto.ChatRequest;
+import com.randb.springaichatstarter.dto.ChatResponse;
+import com.randb.springaichatstarter.util.ChatResponseUtil;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationContext;
@@ -112,38 +114,41 @@ public class ChatModelFactory {
      */
     private static class ChatClientAdapter implements ChatService {
         private final ChatClient chatClient;
-        
+
         public ChatClientAdapter(ChatClient chatClient) {
             this.chatClient = chatClient;
         }
-        
+
         @Override
-        public Flux<String> streamReply(ChatRequest request) {
+        public Flux<ChatResponse> streamReply(ChatRequest request) {
             return chatClient.prompt()
                     .user(request.getPrompt())
                     .stream()
-                    .content();
+                    .content()
+                    .map(content -> ChatResponseUtil.createMessage(request, content));
         }
-        
+
         @Override
-        public String syncReply(ChatRequest request) {
-            return chatClient.prompt()
+        public ChatResponse syncReply(ChatRequest request) {
+            String content = chatClient.prompt()
                     .user(request.getPrompt())
                     .call()
                     .content();
+
+            return ChatResponseUtil.createMessage(request, content);
         }
     }
     
     // 内部默认实现，确保即使没有任何ChatService也能工作
     private static class DefaultChatServiceImpl implements ChatService {
         @Override
-        public Flux<String> streamReply(ChatRequest request) {
-            return Flux.just("默认回复（流式）: " + request.getPrompt());
+        public Flux<ChatResponse> streamReply(ChatRequest request) {
+            return Flux.just(ChatResponseUtil.createMessage(request, "默认回复（流式）: " + request.getPrompt()));
         }
 
         @Override
-        public String syncReply(ChatRequest request) {
-            return "默认回复（同步）: " + request.getPrompt();
+        public ChatResponse syncReply(ChatRequest request) {
+            return ChatResponseUtil.createMessage(request, "默认回复（同步）: " + request.getPrompt());
         }
     }
 }

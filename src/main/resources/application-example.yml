@@ -1,44 +1,44 @@
-# Spring AI Chat Starter 示例配置
-server:
-  port: 8180
+# # Spring AI Chat Starter 示例配置
+# server:
+#   port: 8180
 
-spring:
-  application:
-    name: spring-ai-chat-app
-  # Spring AI Chat Starter 配置
-  ai:
-    # Spring AI 通义千问配置
-    dashscope:
-      chat:
-        options:
-          model: qwen-turbo
-      api-key: ${DASHSCOPE_API_KEY:your-api-key-here}
-    # 默认聊天模型设置
-    model:
-      chat: dashscope
-    # 聊天应用配置
-    chat:
-      # 是否启用AI聊天功能
-      enabled: true
-      # 默认模型
-      default-model: qwen
-      # WebSocket配置
-      websocket:
-        enabled: true
-        path: /api/chat/ws
-      # RabbitMQ配置
-      rabbitmq:
-        enabled: false
-        exchange: chat.exchange
-        queue: chat.queue
-        routing-key: chat.request
-      # 控制器配置
-      controller:
-        enabled: true
-        base-path: /api/chat
+# spring:
+#   application:
+#     name: spring-ai-chat-app
+#   # Spring AI Chat Starter 配置
+#   ai:
+#     # Spring AI 通义千问配置
+#     dashscope:
+#       chat:
+#         options:
+#           model: qwen-turbo
+#       api-key: ${DASHSCOPE_API_KEY:your-api-key-here}
+#     # 默认聊天模型设置
+#     model:
+#       chat: dashscope
+#     # 聊天应用配置
+#     chat:
+#       # 是否启用AI聊天功能
+#       enabled: true
+#       # 默认模型
+#       default-model: qwen
+#       # WebSocket配置
+#       websocket:
+#         enabled: true
+#         path: /api/chat/ws
+#       # RabbitMQ配置
+#       rabbitmq:
+#         enabled: false
+#         exchange: chat.exchange
+#         queue: chat.queue
+#         routing-key: chat.request
+#       # 控制器配置
+#       controller:
+#         enabled: true
+#         base-path: /api/chat
 
-# 日志配置
-logging:
-  level:
-    org.springframework.ai: INFO
-    com.randb.springaichatstarter: INFO 
+# # 日志配置
+# logging:
+#   level:
+#     org.springframework.ai: INFO
+#     com.randb.springaichatstarter: INFO 

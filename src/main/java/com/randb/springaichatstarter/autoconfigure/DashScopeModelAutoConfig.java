@@ -8,12 +8,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -45,7 +46,7 @@ public class DashScopeModelAutoConfig {
      * 解决通义千问API返回的JSON格式问题
      */
     @Bean("dashscopeObjectMapper")
-    @Primary
+    // @Primary
     public ObjectMapper dashscopeObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
         // 配置反序列化特性
@@ -95,6 +96,7 @@ public class DashScopeModelAutoConfig {
         return dashscopeChatModel;
     }
 
+    
     /**
      * 基于ChatModel创建ChatClient
      */
@@ -103,10 +105,13 @@ public class DashScopeModelAutoConfig {
     @ConditionalOnBean(ChatModel.class)
     public ChatClient chatClient(ChatModel chatModel) {
         log.info("成功创建ChatClient，使用ChatModel: {}", chatModel);
+        //初始化基于内存的对话记忆
+        // ChatMemory chatMemory = MessageWindowChatMemory.builder().build();
         return ChatClient.builder(chatModel)
+                // .defaultAdvisors(
+                //         MessageChatMemoryAdvisor.builder(chatMemory).build()
+                // )
                 .defaultSystem("你是一个友好的AI助手，能够提供有用的信息和帮助。")
                 .build();
     }
 }
-
-

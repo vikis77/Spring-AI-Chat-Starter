@@ -103,18 +103,12 @@ public class ChatMessageService {
             }
             
             ChatService chatService = chatModelFactory.get(request.getModel());
-            
+
             // 同步处理请求
-            String reply = chatService.syncReply(request);
-            
-            // 创建响应
-            ChatResponse response = new ChatResponse();
-            response.setRequestId(request.getRequestId());
-            response.setUserId(request.getUserId());
-            response.setContent(reply);
-            response.setTimestamp(System.currentTimeMillis());
-            
-            log.info("Processed chat request: {}, response length: {}", request.getRequestId(), reply.length());
+            ChatResponse response = chatService.syncReply(request);
+
+            log.info("Processed chat request: {}, response length: {}", request.getRequestId(),
+                    response.getContent() != null ? response.getContent().length() : 0);
             
             // 发送响应到回复队列
             String replyTo = request.getReplyTo() != null ? 
