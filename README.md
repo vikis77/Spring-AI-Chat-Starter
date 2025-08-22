@@ -29,10 +29,48 @@ Spring Boot 系统一键接入大模型通信组件，支持通义千问、OpenA
 - **对话记忆** - 支持上下文对话
 - **前端示例** - 提供 HTML/JS 示例页面
 
+## 📦 构建和部署
 
+### 作为 Starter 使用（推荐）
 
+1. **注释 Maven Plugin**：在 `pom.xml` 中注释掉 `spring-boot-maven-plugin`
+   ```xml
+   <!-- 这个plugin会把starter打包为可运行的springboot包，作为starter，不需要 -->
+   <!-- <plugin>
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-maven-plugin</artifactId>
+       ...
+   </plugin> -->
+   ```
 
-## 🚀 快速开始
+2. **安装到本地仓库**：
+   ```bash
+   mvn clean install
+   ```
+
+3. **在业务项目中使用**：
+   ```xml
+   <dependency>
+       <groupId>com.randb</groupId>
+       <artifactId>spring-ai-chat-starter</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+   </dependency>
+   ```
+
+### 独立运行（开发测试）
+
+1. **取消注释 Maven Plugin**：在 `pom.xml` 中取消注释 `spring-boot-maven-plugin`
+
+2. **运行项目**：
+   ```bash
+   mvn spring-boot:run
+   ```
+
+> **重要说明**：
+> - **作为 Starter 使用**：注释掉 `spring-boot-maven-plugin`，安装到本地仓库供其他项目使用
+> - **独立运行项目**：取消注释 `spring-boot-maven-plugin`，可以直接运行此项目进行开发测试
+
+## � 快速开始
 
 ### 1. 添加依赖
 
@@ -70,9 +108,26 @@ spring:
         enabled: true
 ```
 
-### 3. 开始使用
+### 3. 使用服务
 
-启动应用后，访问 `http://localhost:8080` 查看示例页面。
+```java
+@Autowired
+private ChatModelFactory chatModelFactory;
+
+public void chatExample() {
+    // 获取聊天服务
+    ChatService chatService = chatModelFactory.get("qwen");
+
+    // 创建请求
+    ChatRequest request = new ChatRequest();
+    request.setPrompt("你好");
+    request.setUserId("user123");
+
+    // 同步调用
+    ChatResponse response = chatService.syncReply(request);
+    System.out.println(response.getContent());
+}
+```
 
 ## 📖 使用指南
 
@@ -187,48 +242,39 @@ public class YourModelChatServiceImpl implements ChatService {
 }
 ```
 
-2. 在配置中注册：
-
-```yaml
-spring:
-  ai:
-    chat:
-      default-model: your-model
-```
-
-### 自定义配置
-
-创建自定义配置类：
-
-```java
-@Configuration
-public class CustomChatConfiguration {
-
-    @Bean
-    @ConditionalOnProperty("your.custom.property")
-    public ChatService customChatService() {
-        return new YourCustomChatService();
-    }
-}
-```
+2. 在配置中注册模型，使用 chatModelFactory.get("your-model") 获取服务。
 
 ## 🏗️ 项目架构
 
 ```
 spring-ai-chat-starter/
-├── autoconfigure/          # 自动配置类
-│   ├── SpringAiChatAutoConfiguration.java
-│   ├── DashScopeModelAutoConfig.java
-│   └── ...
-├── core/                   # 核心服务
-│   ├── ChatService.java           # 统一聊天接口
-│   ├── ChatModelFactory.java      # 模型工厂
-│   ├── QwenChatServiceImpl.java    # 通义千问实现
-│   └── OpenAIChatServiceImpl.java  # OpenAI实现
-├── controller/             # REST API控制器
-├── dto/                    # 数据传输对象
-├── websocket/              # WebSocket处理器
-└── mq/                     # 消息队列服务
+├── src/main/java/com/randb/springaichatstarter/
+│   ├── autoconfigure/          # 自动配置类
+│   │   ├── SpringAiChatAutoConfiguration.java
+│   │   ├── DashScopeModelAutoConfig.java
+│   │   ├── WebSocketConfiguration.java
+│   │   └── RabbitMQConfiguration.java
+│   ├── core/                   # 核心服务
+│   │   ├── ChatService.java           # 统一聊天接口
+│   │   ├── ChatModelFactory.java      # 模型工厂
+│   │   ├── QwenChatServiceImpl.java    # 通义千问实现
+│   │   └── DefaultQwenChatServiceImpl.java # 降级实现
+│   ├── controller/             # REST API控制器
+│   │   └── ChatController.java
+│   ├── dto/                    # 数据传输对象
+│   │   ├── ChatRequest.java
+│   │   └── ChatResponse.java
+│   ├── websocket/              # WebSocket处理器
+│   │   └── ChatWebSocketHandler.java
+│   ├── mq/                     # 消息队列服务
+│   │   └── ChatMessageService.java
+│   └── util/                   # 工具类
+│       └── ChatResponseUtil.java
+├── src/main/resources/
+│   ├── META-INF/spring/        # 自动配置
+│   ├── static/                 # 示例页面
+│   └── application-template.yml # 配置模板
+└── pom.xml
 ```
 
 ### 设计模式
@@ -237,77 +283,6 @@ spring-ai-chat-starter/
 - **适配器模式**：`ChatClientAdapter` 适配不同模型接口
 - **策略模式**：通过配置选择不同的通信协议
 - **降级模式**：提供默认实现确保服务可用性
-
-## 📦 构建和部署
-
-### 作为 Starter 使用（推荐）
-
-```bash
-# 注意：使用作为 starter 时，需要注释掉 pom.xml 中的 spring-boot-maven-plugin
-
-# 1、安装到本地 Maven 仓库
-mvn clean install
-
-# 2、业务项目中导入依赖（本项目）
-<!-- Spring AI Chat Starter -->
-<dependency>
-    <groupId>com.randb</groupId>
-    <artifactId>spring-ai-chat-starter</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-</dependency>
-
-# 3、xml中配置好LLM
-
-# 4、从服务工厂中获取LLM，即可完成快速集成
-@Autowired
-private ChatModelFactory chatModelFactory;
-
-ChatService chatService = chatModelFactory.get("qwen");
-
-```
-
-### 独立运行（开发测试）
-
-```bash
-# 取消注释 pom.xml 中的 spring-boot-maven-plugin
-# 然后运行
-mvn spring-boot:run
-```
-
-## 📋 API 文档
-
-### REST API
-
-| 端点 | 方法 | 描述 |
-|------|------|------|
-| `/api/chat/sync` | POST | 同步聊天 |
-| `/api/chat/sse` | GET | SSE流式聊天 |
-| `/dev/api/chat/ws/info` | GET | WebSocket信息 |
-
-### 请求格式
-
-```json
-{
-  "requestId": "可选，请求ID",
-  "userId": "用户ID",
-  "prompt": "用户输入的问题",
-  "model": "qwen|openai",
-  "sessionId": "会话ID，用于上下文对话",
-  "stream": false
-}
-```
-
-### 响应格式
-
-```json
-{
-  "type": "message|error|completed",
-  "requestId": "请求ID",
-  "userId": "用户ID",
-  "content": "AI回复内容",
-  "timestamp": 1640995200000
-}
-```
 
 ## 📄 许可证
 
